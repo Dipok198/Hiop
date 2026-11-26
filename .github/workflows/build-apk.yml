@@ -35,15 +35,28 @@ jobs:
             "platforms;android-35" "build-tools;35.0.0" \
             "ndk;27.0.12077973" "cmake;3.22.1"
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+      - name: Find project folder (gradlew)
+        id: find
+        run: |
+          G=$(find . -maxdepth 3 -name gradlew -not -path './.git/*' | head -n 1)
+          if [ -z "$G" ]; then
+            echo "::error::gradlew nahi mili. Repo mein poora project upload karo (app/, gradle/, gradlew, settings.gradle.kts ...)."
+            ls -R . | head -50
+            exit 1
+          fi
+          D=$(dirname "$G")
+          echo "Project dir: $D"
+          echo "dir=$D" >> "$GITHUB_OUTPUT"
+          chmod +x "$G"
 
       # Debug APK: always built, installs directly on a phone.
       - name: Build debug APK
+        working-directory: ${{ steps.find.outputs.dir }}
         run: ./gradlew :app:assembleDebug --stacktrace
 
       # Optional signed release APK: only if KEYSTORE_BASE64 + KEYSTORE_PASSWORD secrets exist.
       - name: Build signed release APK
+        working-directory: ${{ steps.find.outputs.dir }}
         if: env.HAS_KEYSTORE == 'true'
         env:
           SHILEX_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -53,6 +66,7 @@ jobs:
           ./gradlew :app:assembleRelease --stacktrace
 
       - name: Collect APKs
+        working-directory: ${{ steps.find.outputs.dir }}
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/debug/*.apk dist/MISTY-debug.apk
@@ -65,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: MISTY-apk
-          path: dist/*.apk
+          path: ${{ steps.find.outputs.dir }}/dist/*.apk
 
       # Direct-download APK on the Releases page (easy from a phone).
       - name: Publish to Releases
@@ -74,4 +88,4 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: MISTY build ${{ github.run_number }}
-          files: dist/*.apk
+          files: ${{ steps.find.outputs.dir }}/dist/*.apk
