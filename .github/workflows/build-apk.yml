@@ -38,7 +38,11 @@ jobs:
       - name: Find project folder (gradlew)
         id: find
         run: |
-          G=$(find . -maxdepth 3 -name gradlew -not -path './.git/*' | head -n 1)
+          # Agar project zip ki shakal mein upload hua hai to usse kholo
+          for z in ./*.zip; do
+            [ -f "$z" ] && unzip -q -o "$z" -d unzipped_project || true
+          done
+          G=$(find . -maxdepth 4 -name gradlew -not -path './.git/*' | head -n 1)
           if [ -z "$G" ]; then
             echo "::error::gradlew nahi mili. Repo mein poora project upload karo (app/, gradle/, gradlew, settings.gradle.kts ...)."
             ls -R . | head -50
